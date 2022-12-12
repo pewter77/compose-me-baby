@@ -1,0 +1,233 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+  wiki-internal:
+    name: wiki-internal
+    external: false
+
+services:
+  #Code Server
+  code-server:
+    image: linuxserver/code-server
+    container_name: code-server
+    hostname: code-server
+    #ports:
+    #- 8443:8443
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      #- PASSWORD=password #optional
+      #- HASHED_PASSWORD= #optional
+      #- SUDO_PASSWORD=password #optional
+      #- SUDO_PASSWORD_HASH= #optional
+      - PROXY_DOMAIN=code.${DOMAIN} #optional
+      - DEFAULT_WORKSPACE=/config/workspace #optional
+    volumes:
+      - ${APPCONFIG_DIR}/code-server:/config
+      - ${HOME_DATA_DIR}:/srv/home
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.code-server-secure.entrypoints=websecure"
+      - "traefik.http.routers.code-server-secure.rule=Host(`code.${DOMAIN}`)"
+      - "traefik.http.routers.code-server-secure.tls=true"
+      - "traefik.http.routers.code-server-secure.middlewares=authentik-forwardauth@docker"
+
+  #Git Server
+  gitea:
+    image: gitea/gitea
+    container_name: gitea
+    hostname: gitea
+    ports:
+      #- "3000:3000"
+      # For SSH access disabled in environment
+      # Remember to switch to 22 for ease of use on new machine
+      - "222:22"
+    networks:
+      - reverse-proxy
+    environment:
+      - USER_UID=${PUID}
+      - USER_GID=${PGID}
+      - RUN_MODE=prod
+      #- DISABLE_SSH=true
+      - HTTP_PORT=3000
+      - ROOT_URL=https://git.${DOMAIN}
+      ## Uncomment these after installation
+      #- INSTALL_LOCK=true
+      #- SECRET_KEY=${SECRET}
+      #- DISABLE_REGISTRATION=true
+    volumes:
+      - ${APPCONFIG_DIR}/gitea:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitea-secure.entrypoints=websecure"
+      - "traefik.http.routers.gitea-secure.rule=Host(`git.${DOMAIN}`)"
+      - "traefik.http.routers.gitea-secure.tls=true"
+      - "traefik.http.routers.gitea-secure.service=gitea"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+
+  # Dashboard
+  homepage:
+    image: ghcr.io/benphelps/homepage:latest
+    container_name: homepage
+    hostname: homepage
+    #ports:
+    #- 3000:3000
+    networks:
+      - reverse-proxy
+    volumes:
+      - ${APPCONFIG_DIR}/homepage:/app/config # Make sure your local config directory exists
+      - /var/run/docker.sock:/var/run/docker.sock:ro # (optional) For docker integrations
+      - /mnt/Transfer:/mnt/Transfer:ro
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.homarr-secure.rule=Host(`dash.${DOMAIN}`)"
+      - "traefik.http.routers.homarr-secure.tls=true"
+
+  # Task Management
+  vikunja-api:
+    image: vikunja/api:latest
+    container_name: vikunja-api
+    hostname: vikunja-api
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - VIKUNJA_DATABASE_TYPE=sqlite
+      - VIKUNJA_DATABASE_PATH=/app/vikunja/files/vikunja.db
+      - VIKUNJA_SERVICE_FRONTENDURL=http://tasks.${DOMAIN}/
+      - VIKUNJA_MAILER_ENABLED=1
+      - VIKUNJA_MAILER_FORCESSL=1
+      - VIKUNJA_MAILER_HOST=${VIKUNJA_MAILER_URL}
+      - VIKUNJA_MAILER_PORT=${VIKUNJA_MAILER_PORT}
+      - VIKUNJA_MAILER_USERNAME=${VIKUNJA_MAILER_USERNAME}
+      - VIKUNJA_MAILER_PASSWORD=${VIKUNJA_MAILER_PASSWORD}
+    volumes:
+      - ${APPCONFIG_DIR}/vikunja/files:/app/vikunja/files
+      - ${APPCONFIG_DIR}/vikunja/config.yml:/app/vikunja/config.yml
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja-api-secure.entrypoints=websecure"
+      - "traefik.http.routers.vikunja-api-secure.rule=Host(`tasks.${DOMAIN}`) && PathPrefix(`/api/v1`, `/dav/`, `/.well-known/`)"
+      - "traefik.http.routers.vikunja-api-secure.tls=true"
+
+  vikunja-frontend:
+    image: vikunja/frontend:latest
+    container_name: vikunja-frontend
+    hostname: vikunja-frontend
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja-frontend-secure.entrypoints=websecure"
+      - "traefik.http.routers.vikunja-frontend-secure.rule=Host(`tasks.${DOMAIN}`)"
+      - "traefik.http.routers.vikunja-frontend-secure.tls=true"
+
+  # Wiki (Doesn't work right now, didn't really use it anyway fix password if plan to use)
+  bookstack:
+    image: linuxserver/bookstack
+    container_name: bookstack
+    hostname: bookstack
+    #ports:
+    #- 6875:80
+    networks:
+      - reverse-proxy
+      - wiki-internal
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - APP_URL=https://wiki.${DOMAIN}
+      - DB_HOST=bookstack-db
+      - DB_USER=bookstack
+      - DB_PASS=whatever
+      - DB_DATABASE=bookstackapp
+    volumes:
+      - ${APPCONFIG_DIR}/bookstack:/config
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bookstack-frontend-secure.entrypoints=websecure"
+      - "traefik.http.routers.bookstack-frontend-secure.rule=Host(`wiki.${DOMAIN}`)"
+      - "traefik.http.routers.bookstack-frontend-secure.tls=true"
+    depends_on:
+      - bookstack-db
+
+  bookstack-db:
+    image: linuxserver/mariadb
+    container_name: bookstack-db
+    hostname: bookstack-db
+    networks:
+      - wiki-internal
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - MYSQL_ROOT_PASSWORD=whateverroot
+      - MYSQL_DATABASE=bookstackapp
+      - MYSQL_USER=bookstack
+      - MYSQL_PASSWORD=whatever
+    volumes:
+      - ${APPCONFIG_DIR}/bookstack/db:/config
+    restart: unless-stopped
+
+  #Docker Management
+  # Maybe switch to community edition, ee doesn't give me anything I really need
+  portainer:
+    image: portainer/portainer-ee
+    container_name: portainer
+    hostname: portainer
+    #ports:
+    #- 8000:8000/tcp
+    #- 9000:9000/tcp
+    networks:
+      - reverse-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${APPCONFIG_DIR}/portainer:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer-secure.entrypoints=websecure"
+      - "traefik.http.routers.portainer-secure.rule=Host(`docker.${DOMAIN}`)"
+      - "traefik.http.routers.portainer-secure.tls=true"
+      - "traefik.http.routers.portainer-secure.service=portainer"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+
+  portainer-ce:
+    image: portainer/portainer-ce:latest
+    container_name: portainer-ce
+    hostname: portainer-ce
+    #ports:
+    #- 8000:8000/tcp
+    #- 9000:9000/tcp
+    networks:
+      - reverse-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${APPCONFIG_DIR}/portainer-ce:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer-ce-secure.entrypoints=websecure"
+      - "traefik.http.routers.portainer-ce-secure.rule=Host(`portainer.${DOMAIN}`)"
+      - "traefik.http.routers.portainer-ce-secure.tls=true"
+      - "traefik.http.routers.portainer-ce-secure.service=portainer-ce"
+      - "traefik.http.services.portainer-ce.loadbalancer.server.port=9000"

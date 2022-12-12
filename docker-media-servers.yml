@@ -1,0 +1,132 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+  downloads-internal:
+    name: downloads-internal
+
+services:
+  # Media Server
+  emby:
+    image: linuxserver/emby:latest
+    container_name: emby
+    hostname: emby
+    #ports:
+    #- "8096:8096"
+    networks:
+      - reverse-proxy
+      - downloads-internal
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/emby:/config
+      - ${MEDIA_DIR}:/data/media:ro
+    devices:
+      - /dev/dri:/dev/dri
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.emby-secure.entrypoints=websecure"
+      - "traefik.http.routers.emby-secure.rule=Host(`media.${DOMAIN}`)"
+      - "traefik.http.routers.emby-secure.tls=true"
+      - "traefik.http.routers.emby-secure.service=emby"
+      - "traefik.http.services.emby.loadbalancer.server.port=8096"
+
+  # Media Server (Alternative if Android TV App ever works well)
+  jellyfin:
+    image: linuxserver/jellyfin
+    container_name: jellyfin
+    hostname: jellyfin
+    ports:
+      #- 8097:8096
+      #- 8920:8920 #optional https jellyfin interface
+      - 7359:7359/udp #optional network discovery
+      #- 1900:1900/udp #optiona DLNA clients
+    networks:
+      - reverse-proxy
+      - downloads-internal
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - JELLYFIN_PublishedServerUrl=https://jelly.${DOMAIN} #optional
+    volumes:
+      - ${APPCONFIG_DIR}/jellyfin:/config
+      - ${MEDIA_DIR}:/data/media:ro
+    #devices:
+    #- /dev/dri:/dev/dri
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyfin-secure.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin-secure.rule=Host(`jelly.${DOMAIN}`)"
+      - "traefik.http.routers.jellyfin-secure.tls=true"
+      - "traefik.http.routers.jellyfin-secure.service=jellyfin"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+
+  # Music Server
+  plex:
+    image: linuxserver/plex
+    container_name: plex
+    hostname: plex
+    #ports:
+    #- 32400:32400 # Plex Media Access
+    #- 1900:1900/udp # DLNA
+    #- 3005:3005 # Plex companion
+    #- 5353:5353/udp # Bonjour
+    #- 8324:8324 # Roku Companion
+    #- 32410:32410/udp # Local Network Discovery
+    #- 32412:32412/udp # Local Network Discovery
+    #- 32413:32413/udp # Local Network Discovery
+    #- 32414:32414/udp # Local Network Discovery
+    #- 32469:32469 # DLNA
+    #network_mode: host
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - VERSION=docker
+    volumes:
+      - ${APPCONFIG_DIR}/plex:/config
+      - ${MEDIA_DIR}/music:/data/media/music:ro
+    #devices:
+    #- /dev/dri:/dev/dri
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plex-secure.entrypoints=websecure"
+      - "traefik.http.routers.plex-secure.rule=Host(`plex.${DOMAIN}`)"
+      - "traefik.http.routers.plex-secure.tls=true"
+      - "traefik.http.routers.plex-secure.service=plex"
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"
+
+  # Book Server
+  calibre-web:
+    image: linuxserver/calibre-web
+    container_name: calibre-web
+    hostname: calibre-web
+    #ports:
+    #- 8083:8083
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - DOCKER_MODS=linuxserver/mods:universal-calibre
+    volumes:
+      - ${APPCONFIG_DIR}/calibre-web:/config
+      - ${MEDIA_DIR}/books:/data/media/books
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calibre-web-secure.entrypoints=websecure"
+      - "traefik.http.routers.calibre-web-secure.rule=Host(`books.${DOMAIN}`)"
+      - "traefik.http.routers.calibre-web-secure.tls=true"
+      - "traefik.http.routers.calibre-web-secure.middlewares=authentik-forwardauth@docker"

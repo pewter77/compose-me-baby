@@ -1,0 +1,193 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+  cloudflared:
+    name: cloudflared
+
+services:
+  #Traefik Reverse Proxy
+  traefik:
+    image: traefik
+    container_name: traefik
+    hostname: traefik
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      reverse-proxy:
+        aliases:
+          - tasks.${DOMAIN}
+          - auth.${DOMAIN}
+          - whoami.${DOMAIN}
+          - media.${DOMAIN}
+          - requests.${DOMAIN}
+          - nzb.${DOMAIN}
+          - prowlarr.${DOMAIN}
+          - traefik.${DOMAIN}
+          - plex.${DOMAIN}
+      cloudflared:
+    environment:
+      - "CF_DNS_API_TOKEN_FILE=/data/ssl/CF_DNS_API_TOKEN.secret"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${APPCONFIG_DIR}/traefik/:/data
+    restart: unless-stopped
+    command:
+      # Enable API and Dashboard
+      - "--api=true"
+      - "--api.dashboard=true"
+      # Enable Metrics
+      #- "--metrics.prometheus=true"
+      # Enable Logging to data/logs folder
+      - "--log.level=INFO"
+      - "--log.filePath=/data/logs/traefik.log"
+      # Enabled for Access Logs for parsing by Crowdsec/Fail2Ban
+      - "--accesslog=true"
+      - "--accesslog.filepath=/data/logs/access.log"
+      - "--accessLog.bufferingSize=100"
+      # Setup Docker as a Provider of Configuration and Dynamic Updating
+      - "--providers.docker=true"
+      - "--providers.docker.watch=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=reverse-proxy"
+      # Setup a File as a Provider for Dyanmic Config for non-docker containers
+      - "--providers.file.filename=/data/dynamic-config.yml"
+      - "--providers.file.watch=true"
+      # Setup Forced redirection to HTTPS for all traffic
+      - "--entrypoints.web.address=:80"
+      - "--entryPoints.web.forwardedHeaders.trustedIPs=${CLOUDFLARE_IPS},${LOCAL_IPS}"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--entryPoints.websecure.forwardedHeaders.trustedIPs=${CLOUDFLARE_IPS},${LOCAL_IPS}"
+      - "--entrypoints.websecure.http.middlewares=baseline@docker"
+      # Setup DNS Challenge for Cloudflare
+      - "--certificatesresolvers.cloudflare-dns.acme.dnschallenge=true"
+      - "--certificatesresolvers.cloudflare-dns.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.cloudflare-dns.acme.email=${CF_API_EMAIL}"
+      - "--certificatesresolvers.cloudflare-dns.acme.storage=/data/ssl/acme.json"
+      # Caching Module
+      #- "--experimental.plugins.souin.modulename=github.com/darkweak/souin"
+      #- "--experimental.plugins.souin.version=v1.6.22"
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      # Configure Default Basic Auth for Treafik Middleware using file
+      - "traefik.http.middlewares.basic-auth.basicauth.usersfile=/data/auth/userlist"
+      # Security Headers for A+ rating hopefully
+      - "traefik.http.middlewares.secure-headers.headers.sslredirect=true"
+      #- "traefik.http.middlewares.secure-headers.headers.framedeny=true"
+      - "traefik.http.middlewares.secure-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.secure-headers.headers.stsincludesubdomains=true"
+      - "traefik.http.middlewares.secure-headers.headers.stspreload=true"
+      - "traefik.http.middlewares.secure-headers.headers.stsseconds=63072000"
+      - "traefik.http.middlewares.secure-headers.headers.contenttypenosniff=true"
+      - "traefik.http.middlewares.secure-headers.headers.accesscontrolallowmethods=GET,POST"
+      - "traefik.http.middlewares.secure-headers.headers.accesscontrolalloworiginlist=${DOMAIN}"
+      - "traefik.http.middlewares.secure-headers.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.secure-headers.headers.addvaryheader=true"
+      #- "traefik.http.middlewares.secure-headers.headers.contentsecuritypolicy=script-src 'self'"
+      - "traefik.http.middlewares.secure-headers.headers.referrerpolicy=same-origin"
+      # This one is for Calibre-Web Kobo sync since it requires it (why not put it everywhere?)
+      - "traefik.http.middlewares.secure-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.secure-headers.headers.customresponseheaders.X-Forwarded-Proto=https"
+      # Rate Limit
+      - "traefik.http.middlewares.ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.ratelimit.ratelimit.burst=50"
+      # Souin
+      #- "traefik.http.middlewares.souin-cache.plugin.souin.default_cache.ttl=10s"
+      #- "traefik.http.middlewares.souin-cache.plugin.souin.default_cache.default_cache_control=no-store"
+      #- "traefik.http.middlewares.souin-cache.plugin.souin.default_cache.headers=Authorization,Content-Type"
+      #- "traefik.http.middlewares.souin-cache.plugin.souin.api.souin"
+      #- "traefik.http.middlewares.souin-cache.plugin.souin.log_level=debug"
+      # Compress
+      - "traefik.http.middlewares.compress.compress=true"
+      # Middleware Chains
+      - "traefik.http.middlewares.baseline.chain.middlewares=crowdsec-bouncer,ratelimit,secure-headers,compress"
+      # Traefik Dashboard Labels
+      - "traefik.http.routers.traefik-secure.entrypoints=websecure"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-secure.middlewares=secure-headers"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      # Use the certificate resolver defined in the command section
+      - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare-dns"
+      # Wildcard certificate, main domain is domain, sans is wildcard
+      - "traefik.http.routers.traefik-secure.tls.domains[0].main=${DOMAIN}"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.${DOMAIN}"
+      # Define the Traefik name
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  # Cloud Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    depends_on:
+      - traefik
+    hostname: cloudflared
+    networks:
+      - reverse-proxy
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+
+  # Intrustion Detection
+  crowdsec:
+    image: crowdsecurity/crowdsec
+    container_name: crowdsec
+    hostname: crowdsec
+    networks:
+      - reverse-proxy
+    environment:
+      - GID=${PGID}
+      #this is the list of collections we want to install
+      #https://hub.crowdsec.net/author/crowdsecurity/collections/traefik
+      #API Set Below
+      #cscli bouncers add <name>
+      - "COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors crowdsecurity/iptables crowdsecurity/linux"
+      - "BOUNCER_KEY_traefik=${CROWDSEC_API_TRAEFIK}"
+    volumes:
+      - ${APPCONFIG_DIR}/crowdsec:/etc/crowdsec/
+      - ${APPCONFIG_DIR}/crowdsec/db:/var/lib/crowdsec/data/
+      # Traefik Logs for Crowdsec
+      - ${APPCONFIG_DIR}/traefik/logs/:/var/log/traefik
+    restart: unless-stopped
+
+  # Intrustion Detection Bouncer (maybe move to plugins)
+  crowdsec-traefik-bouncer:
+    image: fbonalair/traefik-crowdsec-bouncer
+    container_name: crowdsec-traefik-bouncer
+    hostname: traefik-bouncer
+    expose:
+      - 8081
+    networks:
+      - reverse-proxy
+    environment:
+      - PORT=8081
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_API_TRAEFIK}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+      - CROWDSEC_BOUNCER_LOG_LEVEL=0
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # Create bouncer middleware
+      - "traefik.http.middlewares.crowdsec-bouncer.forwardauth.address=http://crowdsec-traefik-bouncer:8081/api/v1/forwardAuth"
+      - "traefik.http.middlewares.crowdsec-bouncer.forwardauth.trustForwardHeader=true"
+
+  # Who Am I? We'll I'm me of course (headers/requests debugging)
+  whoami:
+    image: traefik/whoami
+    container_name: whoami
+    hostname: whoami
+    networks:
+      - reverse-proxy
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami-secure.entrypoints=websecure"
+      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.${DOMAIN}`)"
+      - "traefik.http.routers.whoami-secure.tls=true"
+      - "traefik.http.routers.whoami-secure.service=whoami"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.services.whoami.loadBalancer.sticky.cookie=true"
+      - "traefik.http.routers.whoami-secure.middlewares=authentik-forwardauth@docker"

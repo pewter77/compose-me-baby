@@ -1,0 +1,17 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+
+services:
+  #Mesh Networking
+  tailscaled:
+    image: tailscale/tailscale:latest
+    container_name: tailscaled
+    privileged: true
+    network_mode: host
+    volumes:
+      - /var/lib:/var/lib
+      - /dev/net/tun:/dev/net/tun
+    restart: unless-stopped
+    command: tailscaled

@@ -1,0 +1,116 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+  documents-internal:
+    name: documents-internal
+    external: false
+
+services:
+  # System Backup
+  duplicacy:
+    image: hotio/duplicacy
+    container_name: duplicacy
+    hostname: duplicacy-unraid
+    #ports:
+    #- 3875:3875
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/duplicacy:/config
+      - ${APPCONFIG_DIR}/duplicacy/cache:/cache
+      - ${APPCONFIG_DIR}/duplicacy/logs:/logs
+      - ${BACKUP_SOURCE_DIR}opt/:/source/opt:ro
+      - ${BACKUP_SOURCE_DIR}mnt/:/source/mnt:ro
+      - ${BACKUP_DESTINATION_DIR}:/destination
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.duplicacy-secure.entrypoints=websecure"
+      - "traefik.http.routers.duplicacy-secure.rule=Host(`backup.${DOMAIN}`)"
+      - "traefik.http.routers.duplicacy-secure.tls=true"
+      - "traefik.http.routers.duplicacy-secure.middlewares=authentik-forwardauth@docker"
+
+  # iCloud Picture Download
+  icloudpd:
+    image: boredazfcuk/icloudpd
+    container_name: icloudpd
+    hostname: icloudpd
+    environment:
+      - user_id=${PUID}
+      - group_id=${PGID}
+      - TZ=${TZ}
+      - synchronisation_interval=172800
+      - notification_days=7
+      - directory_permissions=750
+      - file_permissions=640
+      - download_notifications=True
+      - apple_id=${ICLOUDPD_APPLE_ID}
+      - notification_type=Discord
+      - notification_title=iCloudPD
+      - webhook_body=content
+      - discord_id=${ICLOUDPD_DISCORD_ID}
+      - discord_token=${ICLOUDPD_DISCORD_TOKEN}
+    volumes:
+      - ${APPCONFIG_DIR}/icloudpd:/config
+      - ${ICLOUD_BACKUP_DESTINATION_DIR}/Photos/iCloud:/home/user/iCloud/
+    restart: unless-stopped
+
+  # Documents
+  paperless-ngx:
+    image: linuxserver/paperless-ngx
+    container_name: paperless-ngx
+    hostname: paperless-ngx
+    #ports:
+    #- 8000:8000
+    networks:
+      - reverse-proxy
+      - documents-internal
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - PAPERLESS_TIME_ZONE=${TZ}
+      - DOCKER_MODS=linuxserver/mods:papermerge-multilangocr
+      - OCRLANG=chi-sim
+      - PAPERLESS_URL=https://documents.${DOMAIN}
+      - PAPERLESS_OCR_LANGUAGE=eng+chi_sim
+      - PAPERLESS_TIKA_ENABLED=1
+      - PAPERLESS_TIKA_GOTENBERG_ENDPOINT=http://gotenberg:3000
+      - PAPERLESS_TIKA_ENDPOINT=http://tika:9998
+      - PAPERLESS_FILENAME_FORMAT={created_year}/{correspondent}/{document_type}/{created}{title}
+      - PAPERLESS_TRASH_DIR=/data/trash
+      - PAPERLESS_CONSUMER_DELETE_DUPLICATES=true
+    volumes:
+      - ${APPCONFIG_DIR}/paperless-ngx:/config
+      - ${DOCUMENTS_DIR}/Paperless:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.paperless-secure.entrypoints=websecure"
+      - "traefik.http.routers.paperless-secure.rule=Host(`documents.${DOMAIN}`)"
+      - "traefik.http.routers.paperless-secure.tls=true"
+
+  gotenberg:
+    image: thecodingmachine/gotenberg
+    container_name: gotenberg
+    hostname: gotenberg
+    networks:
+      - documents-internal
+    environment:
+      DISABLE_GOOGLE_CHROME: 1
+    restart: unless-stopped
+
+  tika:
+    image: apache/tika
+    container_name: tika
+    hostname: tika
+    networks:
+      - documents-internal
+    restart: unless-stopped

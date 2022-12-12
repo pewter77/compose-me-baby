@@ -1,0 +1,252 @@
+---
+networks:
+  reverse-proxy:
+    name: reverse-proxy
+  downloads:
+    name: downloads-internal
+
+services:
+  # TV
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    hostname: sonarr
+    #ports:
+    #- "8989:8989"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - DISCORD_WEBHOOK=${SONARR_DISCORD_URL}
+    volumes:
+      - ${APPCONFIG_DIR}/sonarr:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.sonarr-secure.rule=Host(`sonarr.${DOMAIN}`)"
+      - "traefik.http.routers.sonarr-secure.tls=true"
+      - "traefik.http.routers.sonarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # Movies
+  radarr:
+    image: linuxserver/radarr:develop
+    container_name: radarr
+    hostname: radarr
+    #ports:
+    #- "7878:7878"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - DISCORD_WEBHOOK=${RADARR_DISCORD_URL}
+    volumes:
+      - ${APPCONFIG_DIR}/radarr:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.radarr-secure.rule=Host(`radarr.${DOMAIN}`)"
+      - "traefik.http.routers.radarr-secure.tls=true"
+      - "traefik.http.routers.radarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # Music
+  lidarr:
+    image: linuxserver/lidarr:nightly
+    container_name: lidarr
+    hostname: lidarr
+    #ports:
+    #- "8686:8686"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/lidarr:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lidarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.lidarr-secure.rule=Host(`lidarr.${DOMAIN}`)"
+      - "traefik.http.routers.lidarr-secure.tls=true"
+      - "traefik.http.routers.lidarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # Books
+  readarr:
+    image: linuxserver/readarr:develop
+    container_name: readarr
+    hostname: readarr
+    #ports:
+    #- "8787:8787"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/readarr:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.readarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.readarr-secure.rule=Host(`readarr.${DOMAIN}`)"
+      - "traefik.http.routers.readarr-secure.tls=true"
+      - "traefik.http.routers.readarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # Book Organizer
+  calibre:
+    image: linuxserver/calibre
+    container_name: calibre
+    hostname: calibre
+    # ports:
+    #   - 8080:8080
+    #   - 8081:8081
+    networks:
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/calibre:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calibre-secure.entrypoints=websecure"
+      - "traefik.http.routers.calibre-secure.rule=Host(`calibre.${DOMAIN}`)"
+      - "traefik.http.routers.calibre-secure.tls=true"
+      - "traefik.http.routers.calibre-secure.service=calibre"
+      - "traefik.http.services.calibre.loadbalancer.server.port=8080"
+
+  # Indexer Management
+  prowlarr:
+    image: linuxserver/prowlarr:develop
+    container_name: prowlarr
+    hostname: prowlarr
+    #ports:
+    #- 9696:9696
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/prowlarr:/config
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prowlarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.prowlarr-secure.rule=Host(`prowlarr.${DOMAIN}`)"
+      - "traefik.http.routers.prowlarr-secure.tls=true"
+      - "traefik.http.routers.prowlarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # Requests
+  jellyseerr:
+    image: fallenbagel/jellyseerr
+    container_name: jellyseerr
+    hostname: jellyseerr
+    #ports:
+    #- 5055:5055
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+      - JELLYFIN_TYPE=emby
+      #- DEBUG=true
+    volumes:
+      - ${APPCONFIG_DIR}/jellyseerr:/app/config
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyseerr-secure.entrypoints=websecure"
+      - "traefik.http.routers.jellyseerr-secure.rule=Host(`requests.${DOMAIN}`)"
+      - "traefik.http.routers.jellyseerr-secure.tls=true"
+
+  # Subtitles
+  bazarr:
+    image: linuxserver/bazarr
+    container_name: bazarr
+    hostname: bazarr
+    #ports:
+    #- "6767:6767"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/bazarr:/config
+      - ${MEDIA_DIR}:/data/media
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bazarr-secure.entrypoints=websecure"
+      - "traefik.http.routers.bazarr-secure.rule=Host(`subs.${DOMAIN}`)"
+      - "traefik.http.routers.bazarr-secure.tls=true"
+      - "traefik.http.routers.bazarr-secure.middlewares=authentik-forwardauth@docker"
+
+  # chinesesubfinder:
+  #   image: allanpk716/chinesesubfinder
+  #   container_name: chinesesubfinder
+  #   hostname: chinesesubfinder
+  #   expose:
+  #     - "19035"
+  #   ports:
+  #     - "19035:19035"
+  #     - "19037:19037"
+  #   networks:
+  #     - reverse-proxy
+  #     - downloads-internal
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #     - UMASK=${UMASK}
+  #   volumes:
+  #     - ${APPCONFIG_DIR}/chinesesubfinder:/config
+  #     - ${APPCONFIG_DIR}/chinesesubfinder/cache:/app/cache
+  #     - ${MEDIA_DIR}:/data/media
+  #   restart: unless-stopped
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.chinesesubs-secure.entrypoints=websecure"
+  #     - "traefik.http.routers.chinesesubs-secure.rule=Host(`chi-subs.${DOMAIN}`)"
+  #     - "traefik.http.routers.chinesesubs-secure.tls=true"
+  #   cpus: 0.2
+  #   mem_limit: 1024m
