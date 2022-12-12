@@ -24,7 +24,7 @@ services:
     volumes:
       - ${APPCONFIG_DIR}/emby:/config
       - ${MEDIA_DIR}:/data/media:ro
-    devices:
+    #devices:
       #- /dev/dri:/dev/dri
     restart: unless-stopped
     labels:
