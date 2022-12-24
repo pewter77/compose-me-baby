@@ -47,7 +47,7 @@ services:
       #- "3000:3000"
       # For SSH access disabled in environment
       # Remember to switch to 22 for ease of use on new machine
-      - "222:22"
+      - "22:22"
     networks:
       - reverse-proxy
     environment:
