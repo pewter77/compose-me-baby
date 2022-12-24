@@ -23,7 +23,7 @@ services:
       - UMASK=${UMASK}
     volumes:
       - ${APPCONFIG_DIR}/emby:/config
-      - ${MEDIA_DIR}:/data/media:ro
+      - ${MEDIA_DIR}:/data/media
     #devices:
       #- /dev/dri:/dev/dri
     restart: unless-stopped
