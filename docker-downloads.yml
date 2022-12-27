@@ -52,6 +52,7 @@ services:
     volumes:
       - ${APPCONFIG_DIR}/qflood:/config
       - ${DOWNLOAD_DIR}/torrents:/data/downloads/torrents
+      - /mnt/Transfer/torrents/completed:/data/completed
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
