@@ -8,7 +8,7 @@ networks:
 services:
   # TV
   sonarr:
-    image: linuxserver/sonarr
+    image: linuxserver/sonarr:develop
     container_name: sonarr
     hostname: sonarr
     #ports:
