@@ -91,7 +91,7 @@ services:
 
   # Books
   readarr:
-    image: linuxserver/readarr:develop
+    image: linuxserver/readarr:nightly
     container_name: readarr
     hostname: readarr
     #ports:
