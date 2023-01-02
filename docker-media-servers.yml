@@ -135,8 +135,8 @@ services:
     image: ghcr.io/advplyr/audiobookshelf:latest
     container_name: audiobookshelf
     hostname: audiobookshelf
-    #ports:
-      #- 13378:80
+    ports:
+      - 5656:80
     networks:
       - reverse-proxy
     environment:
