@@ -116,6 +116,32 @@ services:
       - "traefik.http.routers.readarr-secure.tls=true"
       - "traefik.http.routers.readarr-secure.middlewares=authentik-forwardauth@docker"
 
+  # Books
+  readarr-audiobooks:
+    image: linuxserver/readarr:nightly
+    container_name: readarr-audiobooks
+    hostname: readarr-audiobooks
+    #ports:
+    #- "8787:8787"
+    networks:
+      - downloads-internal
+      - reverse-proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=${UMASK}
+    volumes:
+      - ${APPCONFIG_DIR}/readarr-audiobooks:/config
+      - ${MEDIA_DIR}:/data/media
+      - ${DOWNLOAD_DIR}:/data/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.readarr-audiobooks-secure.entrypoints=websecure"
+      - "traefik.http.routers.readarr-audiobooks-secure.rule=Host(`areadarr.${DOMAIN}`)"
+      - "traefik.http.routers.readarr-audiobooks-secure.tls=true"
+
   # Book Organizer
   calibre:
     image: linuxserver/calibre
