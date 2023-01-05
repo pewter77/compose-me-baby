@@ -116,7 +116,7 @@ services:
       - "traefik.http.routers.readarr-secure.tls=true"
       - "traefik.http.routers.readarr-secure.middlewares=authentik-forwardauth@docker"
 
-  # Books
+  # AudioBooks
   readarr-audiobooks:
     image: linuxserver/readarr:nightly
     container_name: readarr-audiobooks
@@ -141,6 +141,19 @@ services:
       - "traefik.http.routers.readarr-audiobooks-secure.entrypoints=websecure"
       - "traefik.http.routers.readarr-audiobooks-secure.rule=Host(`areadarr.${DOMAIN}`)"
       - "traefik.http.routers.readarr-audiobooks-secure.tls=true"
+
+  auto-m4b:
+    image: seanap/auto-m4b
+    container_name: auto-m4b
+    hostname: auto-m4b
+    volumes:
+      - ${APPCONFIG_DIR}/auto-m4b:/config
+      - /home/ashranpewter/AudioBookTemp:/temp
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - CPU_CORES=2
+      - SLEEPTIME=1m
 
   # Book Organizer
   calibre:
