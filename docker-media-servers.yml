@@ -83,7 +83,7 @@ services:
     #- 32413:32413/udp # Local Network Discovery
     #- 32414:32414/udp # Local Network Discovery
     #- 32469:32469 # DLNA
-    #network_mode: host
+    network_mode: host
     networks:
       - reverse-proxy
     environment:
