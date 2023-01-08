@@ -231,3 +231,46 @@ services:
       - "traefik.http.routers.portainer-ce-secure.tls=true"
       - "traefik.http.routers.portainer-ce-secure.service=portainer-ce"
       - "traefik.http.services.portainer-ce.loadbalancer.server.port=9000"
+
+  # Online Video Downloading
+  ytdl_material:
+    image: tzahi12345/youtubedl-material:latest
+    container_name: ytdl_material
+    depends_on:
+      - ytdl-mongo-db
+    hostname: ytdl_material
+    #ports:
+    #- "8998:17442"
+    networks:
+      - reverse-proxy
+      - ytdl-material
+    environment:
+      ALLOW_CONFIG_MUTATIONS: "true"
+      ytdl_mongodb_connection_string: "mongodb://ytdl-mongo-db:27017"
+      ytdl_use_local_db: "false"
+      write_ytdl_config: "true"
+    volumes:
+      - ${APPCONFIG_DIR}/app/appdata:/app/appdata
+      - ${APPCONFIG_DIR}/app/audio:/app/audio
+      - ${APPCONFIG_DIR}/app/video:/app/video
+      - ${APPCONFIG_DIR}/app/subscriptions:/app/subscriptions
+      - ${APPCONFIG_DIR}/app/users:/app/users
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ytdl_material-secure.entrypoints=websecure"
+      - "traefik.http.routers.ytdl_material-secure.rule=Host(`ytdl.${DOMAIN}`)"
+      - "traefik.http.routers.ytdl_material-secure.tls=true"
+      - "traefik.http.routers.ytdl_material-secure.service=ytdl_material"
+
+  ytdl-mongo-db:
+    image: mongo
+    container_name: ytdl-mongo-db
+    hostname: ytdl-mongo-db
+    networks:
+      - ytdl-material
+    restart: unless-stopped
+    volumes:
+      - ${APPCONFIG_DIR}/db/:/data/db
+    logging:
+      driver: "none"
