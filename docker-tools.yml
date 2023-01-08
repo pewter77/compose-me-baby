@@ -5,6 +5,9 @@ networks:
   wiki-internal:
     name: wiki-internal
     external: false
+  ytdl-material:
+    name: ytdl-material
+    external: false
 
 services:
   #Code Server
