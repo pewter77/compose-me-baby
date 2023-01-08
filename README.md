@@ -18,6 +18,7 @@ Docker Format:
         environment:
         env_file:
         volumes:
+        logging:
         devices:
         restart:
         command:
