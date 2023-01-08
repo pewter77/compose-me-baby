@@ -265,6 +265,7 @@ services:
       - "traefik.http.routers.ytdl_material-secure.rule=Host(`ytdl.${DOMAIN}`)"
       - "traefik.http.routers.ytdl_material-secure.tls=true"
       - "traefik.http.routers.ytdl_material-secure.service=ytdl_material"
+      - "traefik.http.services.ytdl_material.loadbalancer.server.port=17442"
 
   ytdl-mongo-db:
     image: mongo
