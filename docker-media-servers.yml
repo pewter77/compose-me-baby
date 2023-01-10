@@ -93,8 +93,8 @@ services:
       - VERSION=docker
     volumes:
       - ${APPCONFIG_DIR}/plex:/config
-      - /mnt/smb/Media/music:/data/media/music
-      - /mnt/smb/Media/audiobooks:/data/media/audiobooks
+      - /mnt/Media/music:/data/media/music
+      - /mnt/Media/audiobooks:/data/media/audiobooks
     #devices:
     #- /dev/dri:/dev/dri
     restart: unless-stopped
