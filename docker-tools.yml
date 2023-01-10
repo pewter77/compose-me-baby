@@ -214,27 +214,6 @@ services:
       - "traefik.http.routers.portainer-secure.service=portainer"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
-  portainer-ce:
-    image: portainer/portainer-ce:latest
-    container_name: portainer-ce
-    hostname: portainer-ce
-    #ports:
-    #- 8000:8000/tcp
-    #- 9000:9000/tcp
-    networks:
-      - reverse-proxy
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${APPCONFIG_DIR}/portainer-ce:/data
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.portainer-ce-secure.entrypoints=websecure"
-      - "traefik.http.routers.portainer-ce-secure.rule=Host(`portainer.${DOMAIN}`)"
-      - "traefik.http.routers.portainer-ce-secure.tls=true"
-      - "traefik.http.routers.portainer-ce-secure.service=portainer-ce"
-      - "traefik.http.services.portainer-ce.loadbalancer.server.port=9000"
-
   # Online Video Downloading
   ytdl_material:
     image: tzahi12345/youtubedl-material:latest
