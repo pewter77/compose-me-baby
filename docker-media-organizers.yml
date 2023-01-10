@@ -148,7 +148,7 @@ services:
     hostname: auto-m4b
     volumes:
       - ${APPCONFIG_DIR}/auto-m4b:/config
-      - /home/ashranpewter/AudioBookTemp:/temp
+      - /mnt/Transfer/AudioBookTemp:/temp
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
